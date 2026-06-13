@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Worth It?</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Personal purchase decision system</p>
+          <h1>Worth It?</h1>
+        </div>
+        <div class="topbar-actions" aria-label="App actions">
+          <button class="icon-button" id="resetDemoButton" type="button" title="โหลดตัวอย่าง">
+            <span aria-hidden="true">↻</span>
+            <span class="sr-only">โหลดตัวอย่าง</span>
+          </button>
+          <button class="icon-button danger" id="clearButton" type="button" title="ล้างข้อมูลทั้งหมด">
+            <span aria-hidden="true">⌫</span>
+            <span class="sr-only">ล้างข้อมูลทั้งหมด</span>
+          </button>
+        </div>
+      </header>
+
+      <section class="summary-grid" aria-label="สรุปภาพรวม">
+        <article class="metric">
+          <span class="metric-label">รายการทั้งหมด</span>
+          <strong id="totalItems">0</strong>
+        </article>
+        <article class="metric">
+          <span class="metric-label">งบรวม</span>
+          <strong id="totalCost">฿0</strong>
+        </article>
+        <article class="metric">
+          <span class="metric-label">ซื้อได้แล้วจริง</span>
+          <strong id="readyCount">0</strong>
+        </article>
+        <article class="metric">
+          <span class="metric-label">ความเสี่ยงเสียดายเฉลี่ย</span>
+          <strong id="averageRegret">0%</strong>
+        </article>
+      </section>
+
+      <section class="profile-panel" aria-labelledby="profileTitle">
+        <div class="panel-heading">
+          <h2 id="profileTitle">Financial Profile</h2>
+          <p>ตัวเลขกลางที่ใช้ประเมินทุก wishlist item: เงินสำรองคือเส้นห้ามแตะ ส่วนงบความสุขคือเงินที่ใช้ตัดสินใจซื้อ</p>
+        </div>
+        <form class="profile-form" id="profileForm">
+          <label>
+            เงินสำรองขั้นต่ำ
+            <input id="emergencyReserve" name="emergencyReserve" type="number" min="0" step="1" placeholder="100000" />
+            <span class="field-help">เส้นห้ามแตะสำหรับเหตุฉุกเฉิน ถ้าต้องใช้เงินก้อนนี้จะถือว่า Too Risky</span>
+          </label>
+          <label>
+            งบความสุขรายเดือน
+            <input id="monthlyFunBudget" name="monthlyFunBudget" type="number" min="0" step="1" placeholder="8000" />
+            <span class="field-help">งบสำหรับของอยากได้ ความบันเทิง หรือของที่ทำให้ชีวิตดีขึ้นในเดือนนี้</span>
+          </label>
+          <label>
+            ใช้งบความสุขไปแล้ว
+            <input id="funSpentThisMonth" name="funSpentThisMonth" type="number" min="0" step="1" placeholder="2500" />
+            <span class="field-help">ระบบเอาค่านี้ไปหัก เพื่อคำนวณงบความสุขที่เหลือของเดือนนี้</span>
+          </label>
+          <button class="secondary-button profile-save-button" type="submit">บันทึก Profile</button>
+        </form>
+        <div class="profile-status" id="profileStatus" aria-live="polite"></div>
+        <details class="rules-panel">
+          <summary>กฎที่ใช้ตัดสิน</summary>
+          <div class="rules-grid">
+            <section>
+              <h3>Monthly Fun</h3>
+              <p>แสดงเมื่อราคาของชิ้นนี้ไม่เกินงบความสุขที่เหลือในเดือนนี้</p>
+            </section>
+            <section>
+              <h3>Saved</h3>
+              <p>แสดงเมื่อของแพงกว่างบเดือนนี้ แต่คุณเก็บเงินเพื่อชิ้นนี้ครบแล้ว</p>
+            </section>
+            <section>
+              <h3>Needs plan</h3>
+              <p>แสดงเมื่อราคาเกินงบเดือนนี้ และยังไม่ได้ใส่จำนวนเงินที่จะกันเพิ่มต่อเดือน</p>
+            </section>
+            <section>
+              <h3>X mo left</h3>
+              <p>แสดงเมื่อมีแผนเก็บเงินแล้ว เช่น 4 mo left หมายถึงต้องเก็บอีกประมาณ 4 เดือน</p>
+            </section>
+            <section>
+              <h3>Needs profile</h3>
+              <p>แสดงเมื่อยังไม่ได้ตั้งงบความสุขรายเดือนใน Financial Profile</p>
+            </section>
+            <section>
+              <h3>Too risky</h3>
+              <p>แสดงเมื่อวิธีจ่ายต้องเป็นหนี้ หรือแตะเงินลงทุน/เงินสำรอง</p>
+            </section>
+          </div>
+        </details>
+      </section>
+
+      <section class="workspace">
+        <form class="entry-panel" id="itemForm">
+          <div class="panel-heading">
+            <h2>เพิ่มของที่อยากซื้อ</h2>
+            <p>กรอกเร็วพอให้ไม่ขี้เกียจ แต่ลึกพอให้ตัดสินใจไม่หลอกตัวเอง</p>
+          </div>
+
+          <label>
+            ชื่อรายการ
+            <input id="name" name="name" type="text" autocomplete="off" placeholder="เช่น หูฟังตัดเสียงรบกวน" required />
+          </label>
+
+          <div class="form-row">
+            <label>
+              ราคา
+              <input id="price" name="price" type="number" min="0" step="1" placeholder="8900" required />
+            </label>
+            <label>
+              หมวดหมู่
+              <select id="category" name="category">
+                <option>งาน</option>
+                <option>สุขภาพ</option>
+                <option>บ้าน</option>
+                <option>การเรียนรู้</option>
+                <option>งานอดิเรก</option>
+                <option>เทคโนโลยี</option>
+                <option>อื่นๆ</option>
+              </select>
+            </label>
+          </div>
+
+          <label>
+            เหตุผลที่อยากได้
+            <textarea id="reason" name="reason" rows="3" placeholder="มันช่วยอะไรในชีวิตจริง หรือแค่อยากได้เพราะเห็นโปร?"></textarea>
+          </label>
+
+          <fieldset>
+            <legend>กฎการเงิน</legend>
+            <label>
+              วิธีจ่าย
+              <select id="paymentPlan" name="paymentPlan">
+                <option value="cash">ใช้เงินจากงบความสุข/เงินที่เก็บไว้</option>
+                <option value="reserved-installment">ผ่อน 0% แต่กันเงินครบแล้ว</option>
+                <option value="debt">ต้องเป็นหนี้/แตะเงินลงทุนหรือเงินสำรอง</option>
+              </select>
+              <span class="field-help">ถ้าเลือกเป็นหนี้หรือแตะเงินหลัก รายการจะเป็น Too Risky ทันที</span>
+            </label>
+            <div class="form-row">
+              <label>
+                เก็บไว้เพื่อชิ้นนี้แล้ว
+                <input id="savedForItem" name="savedForItem" type="number" min="0" step="1" placeholder="0" />
+                <span class="field-help">ใช้กับของแพงกว่างบความสุขเดือนนี้ ถ้าเก็บครบแล้วจะผ่านกฎการเงิน</span>
+              </label>
+              <label>
+                จะกันเพิ่มต่อเดือน
+                <input id="monthlySetAside" name="monthlySetAside" type="number" min="0" step="1" placeholder="2000" />
+                <span class="field-help">ระบบใช้ค่านี้คำนวณว่าเหลืออีกกี่เดือนก่อนซื้อได้</span>
+              </label>
+            </div>
+          </fieldset>
+
+          <div class="slider-grid" aria-label="คะแนนวิเคราะห์">
+            <label>
+              เพิ่มคุณภาพชีวิต
+              <input id="joy" name="joy" type="range" min="1" max="5" value="3" />
+              <span class="scale"><span>นิดเดียว</span><output for="joy" id="joyOut">3</output><span>ชัดเจน</span></span>
+              <span class="field-help">ให้คะแนนผลระยะยาว ไม่ใช่อารมณ์อยากได้ตอนเห็นของ</span>
+            </label>
+          </div>
+
+          <fieldset>
+            <legend>Decision gates</legend>
+            <label>
+              ความจำเป็น
+              <select id="needGate" name="needGate">
+                <option value="essential">จำเป็นจริง ไม่ซื้อแล้วมีปัญหา</option>
+                <option value="useful" selected>มีประโยชน์ แต่ยังไม่จำเป็น</option>
+                <option value="nice">อยากได้เฉยๆ</option>
+              </select>
+              <span class="field-help">ถ้าเป็น Nice to Have ต้องใช้บ่อยมากจริงถึงจะมีโอกาส Ready</span>
+            </label>
+            <label>
+              ความถี่ในการใช้
+              <select id="usageGate" name="usageGate">
+                <option value="daily">ทุกวัน/เกือบทุกวัน</option>
+                <option value="weekly" selected>ทุกสัปดาห์</option>
+                <option value="monthly">เดือนละครั้งหรือน้อยกว่า</option>
+              </select>
+              <span class="field-help">ใช้คำนวณ Cost / use: ยิ่งใช้บ่อย ราคาต่อครั้งยิ่งต่ำ</span>
+            </label>
+            <label>
+              ของนี้ซ้ำกับของที่มีไหม
+              <select id="replacementGate" name="replacementGate">
+                <option value="replace">แทนของเดิมที่มีปัญหา</option>
+                <option value="upgrade" selected>อัปเกรดจากของเดิมที่ยังใช้ได้</option>
+                <option value="duplicate">ซ้ำกับของที่มีอยู่แล้ว</option>
+              </select>
+              <span class="field-help">ถ้าซ้ำกับของที่มีอยู่แล้ว จะเพิ่ม Regret Risk</span>
+            </label>
+            <label>
+              จังหวะเวลาตอนนี้
+              <select id="timingGate" name="timingGate">
+                <option value="now">ต้องซื้อช่วงนี้ มีเหตุผลจริง</option>
+                <option value="wait" selected>รอได้</option>
+                <option value="bad">ยังไม่เหมาะตอนนี้</option>
+              </select>
+              <span class="field-help">Bad Timing หมายถึงเงินหรือชีวิตช่วงนี้ยังไม่เหมาะ แม้ของจะดี</span>
+            </label>
+            <label>
+              เทียบตัวเลือกแล้วหรือยัง
+              <select id="alternativeGate" name="alternativeGate">
+                <option value="compared">เทียบแล้วอย่างน้อย 2 ตัวเลือก</option>
+                <option value="not-compared" selected>ยังไม่ได้เทียบ</option>
+                <option value="cheaper-good">มีตัวถูกกว่าที่ตอบโจทย์พอ</option>
+              </select>
+              <span class="field-help">ถ้ายังไม่ได้เทียบ หรือมีตัวถูกกว่าที่พอใช้ได้ ระบบจะยังไม่ให้ Ready</span>
+            </label>
+          </fieldset>
+
+          <fieldset>
+            <legend>สัญญาณเสี่ยงซื้อแล้วเสียดาย</legend>
+            <label class="checkbox-row">
+              <input id="similarOwned" name="similarOwned" type="checkbox" />
+              มีของคล้ายกันอยู่แล้ว
+            </label>
+            <label class="checkbox-row">
+              <input id="trendDriven" name="trendDriven" type="checkbox" />
+              อยากได้เพราะโปร กระแส หรือคนอื่นใช้
+            </label>
+            <label class="checkbox-row">
+              <input id="pastUnused" name="pastUnused" type="checkbox" />
+              เคยซื้อของประเภทนี้แล้วไม่ค่อยได้ใช้
+            </label>
+            <label class="checkbox-row">
+              <input id="promoOnly" name="promoOnly" type="checkbox" />
+              ถ้าไม่มีโปร/ส่วนลด จะไม่อยากซื้อเท่านี้
+            </label>
+            <label class="checkbox-row">
+              <input id="canWait" name="canWait" type="checkbox" checked />
+              รอ 30 วันได้โดยชีวิตไม่พัง
+            </label>
+            <span class="field-help">ถ้ารอได้ ระบบจะบังคับ cooling period ก่อนขึ้น Ready to Buy</span>
+            <label>
+              ระยะเวลารอ
+              <select id="coolingDays" name="coolingDays">
+                <option value="7">7 วัน</option>
+                <option value="14">14 วัน</option>
+                <option value="30" selected>30 วัน</option>
+              </select>
+              <span class="field-help">ของแพงหรือเสี่ยงเสียดายควรใช้ 30 วันเป็นค่าเริ่มต้น</span>
+            </label>
+            <label class="checkbox-row">
+              <input id="stillWantIt" name="stillWantIt" type="checkbox" />
+              รอแล้ว ยังอยากได้อยู่
+            </label>
+            <span class="field-help">ติ๊กหลังครบเวลารอเท่านั้น เพื่อยืนยันว่าไม่ใช่อารมณ์ชั่วคราว</span>
+          </fieldset>
+
+          <div class="form-actions">
+            <button class="primary-button" id="submitButton" type="submit">เพิ่มเข้ารายการ</button>
+            <button class="secondary-button" id="cancelEditButton" type="button" hidden>ยกเลิกแก้ไข</button>
+          </div>
+        </form>
+
+        <section class="list-panel" aria-labelledby="wishlistTitle">
+          <div class="panel-heading list-heading">
+            <div>
+              <h2 id="wishlistTitle">รายการที่ควรตัดสินใจ</h2>
+              <p>ระบบเรียงจากความเหมาะสมสูงสุด พร้อมสถานะและเหตุผลแบบสั้น</p>
+            </div>
+            <label class="compact-control">
+              เรียงตาม
+              <select id="sortMode">
+                <option value="priority">ความเหมาะสม</option>
+                <option value="price-desc">ราคาแพงก่อน</option>
+                <option value="price-asc">ราคาถูกก่อน</option>
+                <option value="regret">เสี่ยงเสียดายสูงก่อน</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="empty-state" id="emptyState">
+            <h3>ยังไม่มีรายการ</h3>
+            <p>เริ่มจากของที่ลังเลอยู่ตอนนี้สักหนึ่งชิ้น แล้วให้คะแนนแบบซื่อๆ</p>
+          </div>
+
+          <div class="wishlist" id="wishlist" aria-live="polite"></div>
+        </section>
+      </section>
+    </main>
+
+    <template id="itemTemplate">
+      <article class="wishlist-item">
+        <div class="item-main">
+          <div>
+            <div class="item-title-row">
+              <h3></h3>
+              <span class="tag"></span>
+            </div>
+            <p class="item-reason"></p>
+          </div>
+          <div class="item-actions">
+            <button class="icon-button edit-button" type="button" title="แก้ไขรายการ">
+              <span aria-hidden="true">✎</span>
+              <span class="sr-only">แก้ไขรายการ</span>
+            </button>
+            <button class="icon-button remove-button" type="button" title="ลบรายการ">
+              <span aria-hidden="true">×</span>
+              <span class="sr-only">ลบรายการ</span>
+            </button>
+          </div>
+        </div>
+        <div class="score-strip">
+          <div>
+            <span>Worth Score</span>
+            <strong class="worth-score"></strong>
+          </div>
+          <div>
+            <span>Regret Risk</span>
+            <strong class="regret-risk"></strong>
+          </div>
+          <div>
+            <span>ราคา</span>
+            <strong class="price"></strong>
+          </div>
+          <div>
+            <span>Cost / use</span>
+            <strong class="cost-per-use"></strong>
+          </div>
+          <div>
+            <span>Plan</span>
+            <strong class="saving-plan"></strong>
+          </div>
+        </div>
+        <div class="recommendation"></div>
+        <div class="readiness"></div>
+        <div class="reason-list"></div>
+      </article>
+    </template>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
