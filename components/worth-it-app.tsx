@@ -20,12 +20,18 @@ import {
   demoItems,
   emptyItem,
   formatCurrency,
-  getCostPerUse,
   getFunBudgetLeft,
+  normalizeFinancialProfile,
+  normalizeItems,
   parseBackupPayload,
+  purchaseStageLabels,
+  scoreItem,
   sortItems,
+  upgradeReasonLabels,
   type FinancialProfile,
+  type PurchaseStage,
   type SortMode,
+  type UpgradeReason,
   type WishItem,
 } from "@/lib/worth-it";
 
@@ -50,7 +56,9 @@ export function WorthItApp() {
     if (typeof window === "undefined") return demoItems;
     try {
       const storedItems = localStorage.getItem(STORAGE_KEY);
-      return storedItems ? (JSON.parse(storedItems) as WishItem[]) : demoItems;
+      const storedProfile = localStorage.getItem(PROFILE_KEY);
+      const profile = storedProfile ? normalizeFinancialProfile(JSON.parse(storedProfile)) : defaultProfile;
+      return storedItems ? normalizeItems(JSON.parse(storedItems), profile) : demoItems;
     } catch {
       return demoItems;
     }
@@ -59,15 +67,16 @@ export function WorthItApp() {
     if (typeof window === "undefined") return defaultProfile;
     try {
       const storedProfile = localStorage.getItem(PROFILE_KEY);
-      return storedProfile ? { ...defaultProfile, ...(JSON.parse(storedProfile) as FinancialProfile) } : defaultProfile;
+      return storedProfile ? normalizeFinancialProfile(JSON.parse(storedProfile)) : defaultProfile;
     } catch {
       return defaultProfile;
     }
   });
-  const [sortMode, setSortMode] = useState<SortMode>("priority");
+  const [sortMode, setSortMode] = useState<SortMode>("worth");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>(emptyItem());
+  const [draftCreatedAt, setDraftCreatedAt] = useState(0);
   const [restoreStatus, setRestoreStatus] = useState<RestoreStatus>(null);
   const displayItems = useMemo(() => (isHydrated ? items : []), [isHydrated, items]);
   const displayFinancialProfile = useMemo(() => (isHydrated ? financialProfile : defaultProfile), [financialProfile, isHydrated]);
@@ -81,6 +90,7 @@ export function WorthItApp() {
   }, [financialProfile]);
 
   const sortedItems = useMemo(() => sortItems(displayItems, displayFinancialProfile, sortMode), [displayFinancialProfile, displayItems, sortMode]);
+  const draftScore = useMemo(() => scoreItem({ ...draft, id: editingId ?? "draft", createdAt: draftCreatedAt }, displayFinancialProfile), [displayFinancialProfile, draft, draftCreatedAt, editingId]);
   const summary = useMemo(() => {
     const totalCost = displayItems.reduce((sum, item) => sum + item.price, 0);
     const readyCount = sortedItems.filter((item) => item.score.readiness.readyToBuy).length;
@@ -95,18 +105,21 @@ export function WorthItApp() {
   function resetDialog() {
     setEditingId(null);
     setDraft(emptyItem());
+    setDraftCreatedAt(0);
     setDialogOpen(false);
   }
 
   function openCreateDialog() {
     setEditingId(null);
     setDraft(emptyItem());
+    setDraftCreatedAt(Date.now());
     setDialogOpen(true);
   }
 
   function openEditDialog(item: WishItem) {
     setEditingId(item.id);
     setDraft({ ...item, updatedAt: item.updatedAt });
+    setDraftCreatedAt(item.createdAt);
     setDialogOpen(true);
   }
 
@@ -120,6 +133,7 @@ export function WorthItApp() {
       id: editingId ?? crypto.randomUUID(),
       name: trimmedName,
       reason: draft.reason.trim(),
+      currentProblem: draft.currentProblem.trim(),
       createdAt: items.find((item) => item.id === editingId)?.createdAt ?? Date.now(),
       updatedAt: editingId ? Date.now() : undefined,
     };
@@ -137,6 +151,7 @@ export function WorthItApp() {
     setItems(demoItems);
     setEditingId(null);
     setDraft(emptyItem());
+    setDraftCreatedAt(0);
     setRestoreStatus(null);
   }
 
@@ -171,6 +186,7 @@ export function WorthItApp() {
       setFinancialProfile(backup.financialProfile);
       setEditingId(null);
       setDraft(emptyItem());
+      setDraftCreatedAt(0);
       setDialogOpen(false);
       setRestoreStatus({
         tone: "success",
@@ -253,8 +269,11 @@ export function WorthItApp() {
         </CardHeader>
         <CardContent className="space-y-4">
           <form className="grid gap-[10px] md:grid-cols-3" onSubmit={(event) => event.preventDefault()}>
-            <Field label="เงินสำรองขั้นต่ำ" help="เส้นห้ามแตะสำหรับเหตุฉุกเฉิน ถ้าต้องใช้เงินก้อนนี้จะถือว่า Too Risky">
+            <Field label="เงินสำรองฉุกเฉินตอนนี้" help="เงินสำรองปัจจุบัน ถ้ายังต่ำกว่าเป้า ของแพงจะถูกบล็อกให้เก็บเงินแยกก่อน">
               <Input type="number" min={0} value={displayFinancialProfile.emergencyReserve} onChange={(event) => setFinancialProfile((current) => ({ ...current, emergencyReserve: Number(event.target.value) || 0 }))} />
+            </Field>
+            <Field label="เป้าเงินสำรองฉุกเฉิน" help="ของเกิน 10,000 บาทจะต้องเช็กว่าถึงเป้านี้แล้วหรือยัง ถ้ายังและยังเก็บเงินไม่ครบจะยังไม่ควรซื้อ">
+              <Input type="number" min={0} value={displayFinancialProfile.targetEmergencyReserve} onChange={(event) => setFinancialProfile((current) => ({ ...current, targetEmergencyReserve: Number(event.target.value) || 0 }))} />
             </Field>
             <Field label="งบความสุขรายเดือน" help="งบสำหรับของอยากได้ ความบันเทิง หรือของที่ทำให้ชีวิตดีขึ้นในเดือนนี้">
               <Input type="number" min={0} value={displayFinancialProfile.monthlyFunBudget} onChange={(event) => setFinancialProfile((current) => ({ ...current, monthlyFunBudget: Number(event.target.value) || 0 }))} />
@@ -266,7 +285,8 @@ export function WorthItApp() {
 
           <div className="flex flex-wrap gap-2">
             <StatusPill text={`งบความสุขเหลือ ${formatCurrency(funBudgetLeft)}`} />
-            <StatusPill text={`เงินสำรองขั้นต่ำ ${formatCurrency(displayFinancialProfile.emergencyReserve)} ห้ามแตะ`} />
+            <StatusPill text={`เงินสำรองตอนนี้ ${formatCurrency(displayFinancialProfile.emergencyReserve)}`} />
+            <StatusPill text={`เป้าสำรองฉุกเฉิน ${formatCurrency(displayFinancialProfile.targetEmergencyReserve)}`} />
           </div>
 
           <details className="rounded-lg border border-[var(--border)] bg-[var(--card-muted)]">
@@ -293,10 +313,13 @@ export function WorthItApp() {
             <div className="grid w-44 gap-2">
               <Label htmlFor="sortMode">เรียงตาม</Label>
               <Select id="sortMode" value={sortMode} onChange={(event) => setSortMode(event.target.value as SortMode)}>
-                <option value="priority">ความเหมาะสม</option>
-                <option value="price-desc">ราคาแพงก่อน</option>
-                <option value="price-asc">ราคาถูกก่อน</option>
-                <option value="regret">เสี่ยงเสียดายสูงก่อน</option>
+                <option value="system">แนะนำโดยระบบ</option>
+                <option value="worth">คะแนนคุ้มค่าสูงสุด</option>
+                <option value="regret-low">ความเสี่ยงเสียใจต่ำสุด</option>
+                <option value="price-asc">ราคาต่ำสุด</option>
+                <option value="price-desc">ราคาสูงสุด</option>
+                <option value="newest">เพิ่มล่าสุด</option>
+                <option value="closest">ใกล้ซื้อได้ที่สุด</option>
               </Select>
             </div>
 
@@ -332,6 +355,34 @@ export function WorthItApp() {
                               </option>
                             ))}
                           </Select>
+                        </Field>
+                        <div className="grid gap-3 rounded-lg border border-[var(--border)] bg-[var(--card-muted)] p-4 sm:col-span-2">
+                          <div>
+                            <span className="block text-[0.78rem] text-[var(--muted-foreground)]">สถานะที่ระบบแนะนำ</span>
+                            <strong className="mt-1 block text-sm font-semibold text-[var(--foreground)]">{purchaseStageLabels[draftScore.stage.recommended]}</strong>
+                            <p className="mt-1 text-xs leading-5 text-[var(--muted-foreground)]">{draftScore.stage.reason}</p>
+                          </div>
+                          <Field label="ปรับเอง" help="ปล่อยไว้ที่ค่าระบบ ถ้าไม่ได้อยาก override สถานะนี้ด้วยตัวเอง">
+                            <div className="flex flex-col gap-2 sm:flex-row">
+                              <Select
+                                value={draft.purchaseStageOverride ?? "__system"}
+                                onChange={(event) => updateDraft("purchaseStageOverride", event.target.value === "__system" ? null : (event.target.value as PurchaseStage))}
+                              >
+                                <option value="__system">ใช้ค่าที่ระบบแนะนำ</option>
+                                {Object.entries(purchaseStageLabels).map(([value, label]) => (
+                                  <option key={value} value={value}>
+                                    {label}
+                                  </option>
+                                ))}
+                              </Select>
+                              <Button type="button" variant="secondary" onClick={() => updateDraft("purchaseStageOverride", null)}>
+                                ใช้ค่าที่ระบบแนะนำ
+                              </Button>
+                            </div>
+                          </Field>
+                        </div>
+                        <Field label="คาดว่าจะใช้กี่ปี" help="ใช้คำนวณ cost per use แบบง่ายๆ ถ้าไม่แน่ใจให้เริ่มที่ 1 ปี">
+                          <Input type="number" min={1} value={draft.expectedUseYears || 1} onChange={(event) => updateDraft("expectedUseYears", Math.max(Number(event.target.value) || 1, 1))} />
                         </Field>
                       </div>
 
@@ -421,6 +472,32 @@ export function WorthItApp() {
                           </Select>
                         </Field>
                       </div>
+
+                      {draft.replacementGate === "upgrade" || draft.similarOwned ? (
+                        <>
+                          <SectionTitle title="Upgrade Check" />
+                          <div className="grid gap-4 sm:grid-cols-2">
+                            <Field label="ของเดิมมีปัญหาอะไร" help="สั้นๆ แต่ชัดพอว่า setup เดิมมี friction อะไรที่ของใหม่จะช่วยแก้">
+                              <Textarea value={draft.currentProblem} onChange={(event) => updateDraft("currentProblem", event.target.value)} placeholder="เช่น ปวดหูหลังใส่เกิน 1 ชั่วโมง หรือประชุมแล้วเสียงรอบข้างรบกวนมาก" />
+                            </Field>
+                            <Field label="เหตุผลที่อยากอัปเกรด">
+                              <Select value={draft.upgradeReason} onChange={(event) => updateDraft("upgradeReason", event.target.value as UpgradeReason)}>
+                                {Object.entries(upgradeReasonLabels).map(([value, label]) => (
+                                  <option key={value} value={value}>
+                                    {label}
+                                  </option>
+                                ))}
+                              </Select>
+                            </Field>
+                            <Field label="ปัญหาของเดิมหนักแค่ไหน" help="0 คือแทบไม่มีปัญหา 5 คือกระทบชีวิตประจำวันชัดเจน">
+                              <RangeField value={draft.currentPainLevel} onChange={(value) => updateDraft("currentPainLevel", value as Draft["currentPainLevel"])} />
+                            </Field>
+                            <Field label="ของใหม่จะช่วยได้มากแค่ไหน" help="0 คือแทบไม่ต่าง 5 คือดีขึ้นชัดเจนมาก">
+                              <RangeField value={draft.improvementImpact} onChange={(value) => updateDraft("improvementImpact", value as Draft["improvementImpact"])} />
+                            </Field>
+                          </div>
+                        </>
+                      ) : null}
                     </div>
                   </div>
 
@@ -475,7 +552,7 @@ function WishCard({ item, onEdit, onDelete }: { item: ReturnType<typeof sortItem
             <h3 className="text-xl font-semibold text-[var(--foreground)]">{item.name}</h3>
             <span className="rounded-full border border-[var(--border)] bg-[#121717] px-3 py-1 text-xs font-semibold text-[var(--muted-foreground)]">{item.category}</span>
           </div>
-          <p className="max-w-2xl text-sm leading-6 text-[var(--muted-foreground)]">{item.reason || "ยังไม่ได้ใส่เหตุผล ลองเพิ่มเหตุผลเพื่อกันการซื้อจากอารมณ์ล้วนๆ"}</p>
+          <p className="max-w-2xl text-sm leading-6 text-[var(--muted-foreground)]">{getReasonCopy(item)}</p>
         </div>
         <div className="flex gap-2">
           <Button type="button" variant="ghost" size="icon" onClick={onEdit} title="แก้ไขรายการ">
@@ -493,7 +570,7 @@ function WishCard({ item, onEdit, onDelete }: { item: ReturnType<typeof sortItem
         <ScoreBox label="Worth Score" value={`${item.score.worthScore}/100`} />
         <ScoreBox label="Regret Risk" value={`${item.score.regretRisk}%`} />
         <ScoreBox label="ราคา" value={formatCurrency(item.price)} />
-        <ScoreBox label="Cost / use" value={formatCurrency(getCostPerUse(item))} />
+        <ScoreBox label="Cost / use" value={item.score.costPerUse.label} />
         <ScoreBox label="Plan" value={item.score.financial.planSummary} />
       </div>
 
@@ -502,7 +579,40 @@ function WishCard({ item, onEdit, onDelete }: { item: ReturnType<typeof sortItem
         <span className={`rounded-lg px-4 py-3 text-sm leading-6 ${readinessClass(item.score.readiness.className)}`}>
           {item.score.readiness.label}: {item.score.readiness.detail}
         </span>
+        <span className="rounded-lg border border-[rgba(45,212,191,0.2)] bg-[rgba(45,212,191,0.08)] px-4 py-3 text-sm font-semibold text-[#5eead4]">
+          สถานะที่ระบบแนะนำ: {purchaseStageLabels[item.score.stage.recommended]}
+        </span>
+        {item.score.stage.overridden ? (
+          <span className="rounded-lg border border-[rgba(251,191,36,0.2)] bg-[rgba(251,191,36,0.08)] px-4 py-3 text-sm font-semibold text-[var(--warning)]">
+            ปรับเอง: {purchaseStageLabels[item.score.stage.effective]}
+          </span>
+        ) : null}
+        {!item.score.stage.overridden ? (
+          <span className="rounded-lg border border-[var(--border)] bg-[#121717] px-4 py-3 text-sm font-semibold text-[var(--foreground)]">
+            สถานะที่ใช้: {purchaseStageLabels[item.score.stage.effective]}
+          </span>
+        ) : null}
       </div>
+
+      <div className="mt-4 grid gap-3 lg:grid-cols-3">
+        <DetailBox label="เหตุผลสถานะ" value={purchaseStageLabels[item.score.stage.recommended]} note={item.score.stage.reason} />
+        <DetailBox
+          label="Cost per use"
+          value={item.score.costPerUse.label}
+          note={`${item.score.costPerUse.usesPerYear} ครั้ง/ปี x ${item.score.costPerUse.expectedUseYears} ปี`}
+        />
+        <DetailBox label="Sort Priority" value={String(Math.round(item.score.sortPriority))} note="ใช้เรียงค่าเริ่มต้น ไม่ใช่ Worth Score ตรงๆ" />
+      </div>
+
+      <BlockGroups blocks={item.score.blocks} />
+
+      {item.replacementGate === "upgrade" || item.similarOwned ? (
+        <div className="mt-4 grid gap-3 lg:grid-cols-3">
+          <DetailBox label="อัปเกรดเพราะ" value={item.score.upgrade.reasonLabel} />
+          <DetailBox label="ปัญหาของเดิม" value={`${item.score.upgrade.currentPainLevel}/5`} note={item.score.upgrade.currentProblem || "ยังไม่ได้ระบุปัญหาของของเดิม"} />
+          <DetailBox label="ผลลัพธ์ที่คาดว่าจะดีขึ้น" value={`${item.score.upgrade.improvementImpact}/5`} />
+        </div>
+      ) : null}
 
       <div className="mt-4 flex flex-wrap gap-2">
         {item.score.reasons.map((reason) => (
@@ -518,6 +628,68 @@ function ScoreBox({ label, value }: { label: string; value: string }) {
     <div className="rounded-lg border border-[var(--border)] bg-[#121717] p-4">
       <span className="block text-[0.78rem] text-[var(--muted-foreground)]">{label}</span>
       <strong className="mt-2 block text-base font-semibold text-[var(--foreground)]">{value}</strong>
+    </div>
+  );
+}
+
+function DetailBox({ label, value, note, tone = "normal" }: { label: string; value: string; note?: string; tone?: "normal" | "danger" }) {
+  return (
+    <div className={`rounded-lg border p-4 ${tone === "danger" ? "border-[rgba(251,113,133,0.2)] bg-[rgba(251,113,133,0.08)]" : "border-[var(--border)] bg-[#121717]"}`}>
+      <span className="block text-[0.78rem] text-[var(--muted-foreground)]">{label}</span>
+      <strong className={`mt-2 block text-sm font-semibold ${tone === "danger" ? "text-[var(--danger)]" : "text-[var(--foreground)]"}`}>{value}</strong>
+      {note ? <p className="mt-2 text-xs leading-5 text-[var(--muted-foreground)]">{note}</p> : null}
+    </div>
+  );
+}
+
+function BlockGroups({ blocks }: { blocks: ReturnType<typeof scoreItem>["blocks"] }) {
+  const groups = [
+    ["การเงิน", blocks.financial],
+    ["การตัดสินใจ", blocks.decision],
+    ["การอัปเกรด", blocks.upgrade],
+    ["Cooling period", blocks.cooling],
+  ] as const;
+  const visibleGroups = groups.filter(([, reasons]) => reasons.length > 0);
+
+  if (visibleGroups.length === 0) return null;
+
+  return (
+    <section className="mt-4 rounded-lg border border-[rgba(251,191,36,0.2)] bg-[rgba(251,191,36,0.06)] p-4">
+      <h4 className="text-sm font-semibold text-[var(--warning)]">เหตุผลที่ยังไม่ควรซื้อ</h4>
+      <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        {visibleGroups.map(([label, reasons]) => (
+          <div key={label} className="rounded-lg border border-[var(--border)] bg-[#121717] p-3">
+            <strong className="block text-xs font-semibold text-[var(--foreground)]">{label}</strong>
+            <ul className="mt-2 grid gap-1 text-xs leading-5 text-[var(--muted-foreground)]">
+              {reasons.map((reason) => (
+                <li key={reason}>{reason}</li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function getReasonCopy(item: ReturnType<typeof sortItems>[number]) {
+  if (item.reason.trim()) return item.reason;
+  if (item.currentProblem.trim()) return "มีปัญหาของเดิมแล้ว แต่ถ้าอยากชัดขึ้นให้เพิ่มเหตุผลสั้น ๆ ได้";
+  if (item.upgradeReason !== "wantBetter" || item.currentPainLevel > 0 || item.improvementImpact > 0) {
+    return "มีข้อมูลปัญหา/ผลลัพธ์บางส่วนแล้ว ถ้าอยากชัดขึ้นให้เพิ่มเหตุผลสั้น ๆ ได้";
+  }
+  return "ยังไม่ได้ใส่เหตุผล ลองเพิ่มเหตุผลเพื่อกันการซื้อจากอารมณ์ล้วนๆ";
+}
+
+function RangeField({ value, onChange }: { value: number; onChange: (value: number) => void }) {
+  return (
+    <div className="rounded-lg border border-[var(--border)] bg-[var(--card-muted)] px-4 py-4">
+      <input className="w-full accent-[var(--accent)]" type="range" min={0} max={5} value={value} onChange={(event) => onChange(Number(event.target.value))} />
+      <div className="mt-2 flex items-center justify-between text-xs font-medium text-[var(--muted-foreground)]">
+        <span>0</span>
+        <span className="rounded-full bg-[rgba(45,212,191,0.14)] px-3 py-1 text-[var(--accent)]">{value}</span>
+        <span>5</span>
+      </div>
     </div>
   );
 }
