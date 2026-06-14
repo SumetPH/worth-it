@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { Download, Pencil, Plus, RotateCcw, Trash2, Upload } from "lucide-react";
+import { Download, Pencil, Plus, Trash2, Upload } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -147,14 +147,6 @@ export function WorthItApp() {
     if (editingId === itemId) resetDialog();
   }
 
-  function resetDemo() {
-    setItems(demoItems);
-    setEditingId(null);
-    setDraft(emptyItem());
-    setDraftCreatedAt(0);
-    setRestoreStatus(null);
-  }
-
   function handleBackup() {
     const backup = createBackupPayload(items, financialProfile);
     const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
@@ -218,14 +210,6 @@ export function WorthItApp() {
           <Button type="button" variant="secondary" onClick={() => fileInputRef.current?.click()} disabled={!isHydrated}>
             <Upload className="size-4" />
             Restore
-          </Button>
-          <Button type="button" variant="secondary" size="icon" onClick={resetDemo} title="โหลดตัวอย่าง">
-            <RotateCcw className="size-4" />
-            <span className="sr-only">โหลดตัวอย่าง</span>
-          </Button>
-          <Button type="button" variant="ghost" size="icon" onClick={() => setItems([])} title="ล้างข้อมูลทั้งหมด" className="hover:border-[var(--danger)] hover:text-[var(--danger)]">
-            <Trash2 className="size-4" />
-            <span className="sr-only">ล้างข้อมูลทั้งหมด</span>
           </Button>
         </div>
       </header>
@@ -303,11 +287,11 @@ export function WorthItApp() {
         </CardContent>
       </Card>
 
-      <Card className={!isHydrated ? "hidden" : ""} aria-hidden={!isHydrated}>
-        <CardHeader className="gap-4 md:flex-row md:items-end md:justify-between">
+      <section className={!isHydrated ? "hidden" : ""} aria-hidden={!isHydrated}>
+        <div className="mb-4 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
-            <CardTitle>รายการที่ควรตัดสินใจ</CardTitle>
-            <CardDescription>ระบบเรียงจากความเหมาะสมสูงสุด พร้อมสถานะและเหตุผลแบบสั้น</CardDescription>
+            <h2 className="text-[1.05rem] font-semibold tracking-tight text-[var(--foreground)]">รายการที่ควรตัดสินใจ</h2>
+            <p className="text-sm leading-6 text-[var(--muted-foreground)]">ระบบเรียงจากความเหมาะสมสูงสุด พร้อมสถานะและเหตุผลแบบสั้น</p>
           </div>
           <div className="flex flex-wrap items-end gap-3">
             <div className="grid w-44 gap-2">
@@ -511,23 +495,21 @@ export function WorthItApp() {
               </DialogContent>
             </Dialog>
           </div>
-        </CardHeader>
+        </div>
 
-        <CardContent>
-          {sortedItems.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-[var(--border)] px-6 py-12 text-center">
-              <h3 className="text-xl font-semibold text-[var(--foreground)]">ยังไม่มีรายการ</h3>
-              <p className="mt-2 text-sm leading-6 text-[var(--muted-foreground)]">เริ่มจากของที่ลังเลอยู่ตอนนี้สักหนึ่งชิ้น แล้วให้คะแนนแบบซื่อๆ</p>
-            </div>
-          ) : (
-            <div className="grid gap-4">
-              {sortedItems.map((item) => (
-                <WishCard key={item.id} item={item} onEdit={() => openEditDialog(item)} onDelete={() => removeItem(item.id)} />
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        {sortedItems.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-[var(--border)] px-6 py-12 text-center">
+            <h3 className="text-xl font-semibold text-[var(--foreground)]">ยังไม่มีรายการ</h3>
+            <p className="mt-2 text-sm leading-6 text-[var(--muted-foreground)]">เริ่มจากของที่ลังเลอยู่ตอนนี้สักหนึ่งชิ้น แล้วให้คะแนนแบบซื่อๆ</p>
+          </div>
+        ) : (
+          <div className="grid gap-4">
+            {sortedItems.map((item) => (
+              <WishCard key={item.id} item={item} onEdit={() => openEditDialog(item)} onDelete={() => removeItem(item.id)} />
+            ))}
+          </div>
+        )}
+      </section>
     </main>
   );
 }
@@ -544,8 +526,10 @@ function MetricCard({ label, value }: { label: string; value: string }) {
 }
 
 function WishCard({ item, onEdit, onDelete }: { item: ReturnType<typeof sortItems>[number]; onEdit: () => void; onDelete: () => void }) {
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+
   return (
-    <article className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-4 shadow-[var(--shadow)]">
+    <article className="rounded-[22px] border border-[var(--border)] bg-[linear-gradient(180deg,rgba(37,45,44,0.64),rgba(23,27,27,0.96))] p-4 shadow-[var(--shadow)] sm:p-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-3">
@@ -559,14 +543,39 @@ function WishCard({ item, onEdit, onDelete }: { item: ReturnType<typeof sortItem
             <Pencil className="size-4" />
             <span className="sr-only">แก้ไขรายการ</span>
           </Button>
-          <Button type="button" variant="ghost" size="icon" onClick={onDelete} title="ลบรายการ" className="hover:border-[var(--danger)] hover:text-[var(--danger)]">
-            <Trash2 className="size-4" />
-            <span className="sr-only">ลบรายการ</span>
-          </Button>
+          <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+            <DialogTrigger asChild>
+              <Button type="button" variant="ghost" size="icon" title="ลบรายการ" className="hover:border-[var(--danger)] hover:text-[var(--danger)]">
+                <Trash2 className="size-4" />
+                <span className="sr-only">ลบรายการ</span>
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="w-[min(520px,calc(100vw-1.5rem))]">
+              <DialogHeader>
+                <DialogTitle>ยืนยันการลบรายการ</DialogTitle>
+                <DialogDescription>ถ้าลบแล้ว รายการ {item.name} จะหายจากหน้าและต้องเพิ่มใหม่เองหากอยากได้กลับมา</DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button type="button" variant="secondary" onClick={() => setDeleteDialogOpen(false)}>
+                  ยกเลิก
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => {
+                    onDelete();
+                    setDeleteDialogOpen(false);
+                  }}
+                  className="border-[rgba(251,113,133,0.2)] bg-[rgba(251,113,133,0.12)] text-[var(--danger)] hover:bg-[rgba(251,113,133,0.18)]"
+                >
+                  ลบรายการนี้
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
         <ScoreBox label="Worth Score" value={`${item.score.worthScore}/100`} />
         <ScoreBox label="Regret Risk" value={`${item.score.regretRisk}%`} />
         <ScoreBox label="ราคา" value={formatCurrency(item.price)} />
@@ -574,43 +583,47 @@ function WishCard({ item, onEdit, onDelete }: { item: ReturnType<typeof sortItem
         <ScoreBox label="Plan" value={item.score.financial.planSummary} />
       </div>
 
-      <div className="mt-4 flex flex-wrap items-start gap-3">
-        <span className={`rounded-lg border px-4 py-3 text-sm font-semibold ${recommendationClass(item.score.recommendation.className)}`}>{item.score.recommendation.label}</span>
-        <span className={`rounded-lg px-4 py-3 text-sm leading-6 ${readinessClass(item.score.readiness.className)}`}>
+      <div className="mt-4 flex flex-wrap items-start gap-2">
+        <span className={`rounded-2xl border px-3 py-2.5 text-sm font-semibold ${recommendationClass(item.score.recommendation.className)}`}>{item.score.recommendation.label}</span>
+        <span className={`rounded-2xl px-3 py-2.5 text-sm leading-6 ${readinessClass(item.score.readiness.className)}`}>
           {item.score.readiness.label}: {item.score.readiness.detail}
         </span>
-        <span className="rounded-lg border border-[rgba(45,212,191,0.2)] bg-[rgba(45,212,191,0.08)] px-4 py-3 text-sm font-semibold text-[#5eead4]">
+        <span className="rounded-2xl border border-[rgba(45,212,191,0.2)] bg-[rgba(45,212,191,0.08)] px-3 py-2.5 text-sm font-semibold text-[#5eead4]">
           สถานะที่ระบบแนะนำ: {purchaseStageLabels[item.score.stage.recommended]}
         </span>
         {item.score.stage.overridden ? (
-          <span className="rounded-lg border border-[rgba(251,191,36,0.2)] bg-[rgba(251,191,36,0.08)] px-4 py-3 text-sm font-semibold text-[var(--warning)]">
+          <span className="rounded-2xl border border-[rgba(251,191,36,0.2)] bg-[rgba(251,191,36,0.08)] px-3 py-2.5 text-sm font-semibold text-[var(--warning)]">
             ปรับเอง: {purchaseStageLabels[item.score.stage.effective]}
           </span>
         ) : null}
         {!item.score.stage.overridden ? (
-          <span className="rounded-lg border border-[var(--border)] bg-[#121717] px-4 py-3 text-sm font-semibold text-[var(--foreground)]">
+          <span className="rounded-2xl border border-[var(--border)] bg-[rgba(18,23,23,0.82)] px-3 py-2.5 text-sm font-semibold text-[var(--foreground)]">
             สถานะที่ใช้: {purchaseStageLabels[item.score.stage.effective]}
           </span>
         ) : null}
       </div>
 
-      <div className="mt-4 grid gap-3 lg:grid-cols-3">
-        <DetailBox label="เหตุผลสถานะ" value={purchaseStageLabels[item.score.stage.recommended]} note={item.score.stage.reason} />
-        <DetailBox
-          label="Cost per use"
-          value={item.score.costPerUse.label}
-          note={`${item.score.costPerUse.usesPerYear} ครั้ง/ปี x ${item.score.costPerUse.expectedUseYears} ปี`}
-        />
-        <DetailBox label="Sort Priority" value={String(Math.round(item.score.sortPriority))} note="ใช้เรียงค่าเริ่มต้น ไม่ใช่ Worth Score ตรงๆ" />
+      <div className="mt-4 border-t border-[rgba(255,255,255,0.06)] pt-4">
+        <div className="grid gap-2 lg:grid-cols-3">
+          <DetailBox label="เหตุผลสถานะ" value={purchaseStageLabels[item.score.stage.recommended]} note={item.score.stage.reason} />
+          <DetailBox
+            label="Cost per use"
+            value={item.score.costPerUse.label}
+            note={`${item.score.costPerUse.usesPerYear} ครั้ง/ปี x ${item.score.costPerUse.expectedUseYears} ปี`}
+          />
+          <DetailBox label="Sort Priority" value={String(Math.round(item.score.sortPriority))} note="ใช้เรียงค่าเริ่มต้น ไม่ใช่ Worth Score ตรงๆ" />
+        </div>
       </div>
 
       <BlockGroups blocks={item.score.blocks} />
 
       {item.replacementGate === "upgrade" || item.similarOwned ? (
-        <div className="mt-4 grid gap-3 lg:grid-cols-3">
-          <DetailBox label="อัปเกรดเพราะ" value={item.score.upgrade.reasonLabel} />
-          <DetailBox label="ปัญหาของเดิม" value={`${item.score.upgrade.currentPainLevel}/5`} note={item.score.upgrade.currentProblem || "ยังไม่ได้ระบุปัญหาของของเดิม"} />
-          <DetailBox label="ผลลัพธ์ที่คาดว่าจะดีขึ้น" value={`${item.score.upgrade.improvementImpact}/5`} />
+        <div className="mt-4 border-t border-[rgba(255,255,255,0.06)] pt-4">
+          <div className="grid gap-2 lg:grid-cols-3">
+            <DetailBox label="อัปเกรดเพราะ" value={item.score.upgrade.reasonLabel} />
+            <DetailBox label="ปัญหาของเดิม" value={`${item.score.upgrade.currentPainLevel}/5`} note={item.score.upgrade.currentProblem || "ยังไม่ได้ระบุปัญหาของของเดิม"} />
+            <DetailBox label="ผลลัพธ์ที่คาดว่าจะดีขึ้น" value={`${item.score.upgrade.improvementImpact}/5`} />
+          </div>
         </div>
       ) : null}
 
@@ -625,7 +638,7 @@ function WishCard({ item, onEdit, onDelete }: { item: ReturnType<typeof sortItem
 
 function ScoreBox({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-[var(--border)] bg-[#121717] p-4">
+    <div className="rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[rgba(18,23,23,0.52)] px-3 py-3 backdrop-blur-[2px]">
       <span className="block text-[0.78rem] text-[var(--muted-foreground)]">{label}</span>
       <strong className="mt-2 block text-base font-semibold text-[var(--foreground)]">{value}</strong>
     </div>
@@ -634,7 +647,13 @@ function ScoreBox({ label, value }: { label: string; value: string }) {
 
 function DetailBox({ label, value, note, tone = "normal" }: { label: string; value: string; note?: string; tone?: "normal" | "danger" }) {
   return (
-    <div className={`rounded-lg border p-4 ${tone === "danger" ? "border-[rgba(251,113,133,0.2)] bg-[rgba(251,113,133,0.08)]" : "border-[var(--border)] bg-[#121717]"}`}>
+    <div
+      className={`rounded-2xl px-3 py-3 ${
+        tone === "danger"
+          ? "border border-[rgba(251,113,133,0.16)] bg-[rgba(251,113,133,0.08)]"
+          : "border border-[rgba(255,255,255,0.07)] bg-[rgba(18,23,23,0.42)]"
+      }`}
+    >
       <span className="block text-[0.78rem] text-[var(--muted-foreground)]">{label}</span>
       <strong className={`mt-2 block text-sm font-semibold ${tone === "danger" ? "text-[var(--danger)]" : "text-[var(--foreground)]"}`}>{value}</strong>
       {note ? <p className="mt-2 text-xs leading-5 text-[var(--muted-foreground)]">{note}</p> : null}
@@ -654,11 +673,11 @@ function BlockGroups({ blocks }: { blocks: ReturnType<typeof scoreItem>["blocks"
   if (visibleGroups.length === 0) return null;
 
   return (
-    <section className="mt-4 rounded-lg border border-[rgba(251,191,36,0.2)] bg-[rgba(251,191,36,0.06)] p-4">
+    <section className="mt-4 border-t border-[rgba(251,191,36,0.12)] pt-4">
       <h4 className="text-sm font-semibold text-[var(--warning)]">เหตุผลที่ยังไม่ควรซื้อ</h4>
-      <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
         {visibleGroups.map(([label, reasons]) => (
-          <div key={label} className="rounded-lg border border-[var(--border)] bg-[#121717] p-3">
+          <div key={label} className="rounded-2xl border border-[rgba(251,191,36,0.16)] bg-[rgba(251,191,36,0.05)] px-3 py-3">
             <strong className="block text-xs font-semibold text-[var(--foreground)]">{label}</strong>
             <ul className="mt-2 grid gap-1 text-xs leading-5 text-[var(--muted-foreground)]">
               {reasons.map((reason) => (
