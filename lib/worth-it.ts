@@ -7,6 +7,8 @@ export type TimingGate = "now" | "wait" | "bad";
 export type AlternativeGate = "compared" | "not-compared" | "cheaper-good";
 export type PurchaseStage = "park" | "research" | "saving" | "buy";
 export type UpgradeReason = "broken" | "discomfort" | "productivity" | "qualityOfLife" | "wantBetter" | "fomo";
+export type ProductType = "durable" | "upgrade" | "subscription" | "experience" | "learning" | "health" | "home";
+export type EvidenceLevel = "feeling" | "researched" | "tried" | "problem-proven";
 export type SortMode = "system" | "worth" | "regret-low" | "price-asc" | "price-desc" | "newest" | "closest";
 
 export type WishItem = {
@@ -14,10 +16,13 @@ export type WishItem = {
   name: string;
   price: number;
   category: Category;
+  productType: ProductType;
   reason: string;
+  evidenceLevel: EvidenceLevel;
   paymentPlan: PaymentPlan;
   savedForItem: number;
   monthlySetAside: number;
+  recurringCost: number;
   needGate: NeedGate;
   usageGate: UsageGate;
   replacementGate: ReplacementGate;
@@ -74,15 +79,34 @@ export const purchaseStageLabels: Record<PurchaseStage, string> = {
 };
 
 export const upgradeReasonLabels: Record<UpgradeReason, string> = {
-  broken: "ของเดิมเสีย / เริ่มไม่ไหว",
-  discomfort: "ของเดิมทำให้ไม่สบาย / รำคาญ / ปวด / อึดอัด",
-  productivity: "ช่วยงานหรือ workflow ดีขึ้น",
-  qualityOfLife: "ชีวิตประจำวันดีขึ้น",
-  wantBetter: "ของเดิมยังดี แต่อยากได้ของที่ดีกว่า",
-  fomo: "เห็นรีวิว / โปร / กระแส แล้วอยากได้",
+  broken: "🔧 ของเดิมเสีย / พัง / หมดสภาพ",
+  discomfort: "😣 ส่งผลเสียต่อร่างกาย (ใช้แล้วปวด/เมื่อย/อึดอัด)",
+  productivity: "🚀 ช่วยงานดีขึ้น (ประหยัดเวลา/ลดขั้นตอนชัดเจน)",
+  qualityOfLife: "🏡 เพิ่มคุณภาพชีวิต (ผ่อนแรง/นอนดีขึ้น/สุขภาพจิตดีขึ้น)",
+  wantBetter: "💎 ของเดิมยังดี แต่อยากได้ที่ใหม่/สเปกสูงกว่าเดิม",
+  fomo: "🔥 ตามกระแส (โดนป้ายยา/โปรลดจำกัดเวลา)",
+};
+
+export const productTypeLabels: Record<ProductType, string> = {
+  durable: "📦 ของใช้ / อุปกรณ์",
+  upgrade: "⚡ อัปเกรดของเดิม",
+  subscription: "🔄 สมาชิก / บริการต่อเนื่อง",
+  experience: "✈️ ทริป / ประสบการณ์",
+  learning: "🎓 การเรียนรู้",
+  health: "🛡️ สุขภาพ / ความปลอดภัย",
+  home: "🏠 บ้าน / เครื่องใช้",
+};
+
+export const evidenceLevelLabels: Record<EvidenceLevel, string> = {
+  feeling: "💭 แค่ความรู้สึก (ยังไม่มีข้อมูลสเปก/ของจริง)",
+  researched: "📖 หาข้อมูลแน่น (ดูรีวิวละเอียดและเปรียบเทียบแล้ว)",
+  tried: "🧪 ทดลองใช้จริง (เคยไปลองที่ร้าน/ยืมเพื่อน/เช่ามาใช้)",
+  "problem-proven": "🛠️ มีปัญหาชัดเจน (เกิดปัญหากับของเดิมจนยืนยันแล้ว)",
 };
 
 export const categories: Category[] = ["งาน", "สุขภาพ", "บ้าน", "การเรียนรู้", "งานอดิเรก", "เทคโนโลยี", "อื่นๆ"];
+export const productTypes: ProductType[] = ["durable", "upgrade", "subscription", "experience", "learning", "health", "home"];
+export const evidenceLevels: EvidenceLevel[] = ["feeling", "researched", "tried", "problem-proven"];
 
 const DEMO_CREATED_AT = {
   headphones: Date.parse("2026-06-13T09:00:00.000Z"),
@@ -96,10 +120,13 @@ export const demoItems: WishItem[] = [
     name: "หูฟังตัดเสียงรบกวน",
     price: 8900,
     category: "งาน",
+    productType: "upgrade",
     reason: "ช่วยโฟกัสตอนทำงานนอกบ้านและประชุมบ่อยขึ้น",
+    evidenceLevel: "problem-proven",
     paymentPlan: "cash",
     savedForItem: 0,
     monthlySetAside: 2500,
+    recurringCost: 0,
     needGate: "useful",
     usageGate: "daily",
     replacementGate: "upgrade",
@@ -126,10 +153,13 @@ export const demoItems: WishItem[] = [
     name: "คีย์บอร์ดรุ่นใหม่",
     price: 5200,
     category: "เทคโนโลยี",
+    productType: "upgrade",
     reason: "ตัวเก่ายังใช้ได้ แต่อยากได้สัมผัสใหม่และเห็นรีวิวบ่อย",
+    evidenceLevel: "feeling",
     paymentPlan: "cash",
     savedForItem: 0,
     monthlySetAside: 1500,
+    recurringCost: 0,
     needGate: "nice",
     usageGate: "weekly",
     replacementGate: "duplicate",
@@ -156,10 +186,13 @@ export const demoItems: WishItem[] = [
     name: "รองเท้าวิ่ง",
     price: 3600,
     category: "สุขภาพ",
+    productType: "health",
     reason: "คู่เดิมเริ่มเจ็บเท้า ถ้าวิ่งต่อควรเปลี่ยนจริง",
+    evidenceLevel: "problem-proven",
     paymentPlan: "cash",
     savedForItem: 0,
     monthlySetAside: 0,
+    recurringCost: 0,
     needGate: "essential",
     usageGate: "weekly",
     replacementGate: "replace",
@@ -187,10 +220,13 @@ export const emptyItem = (): Omit<WishItem, "id" | "createdAt"> => ({
   name: "",
   price: 0,
   category: "งาน",
+  productType: "durable",
   reason: "",
+  evidenceLevel: "feeling",
   paymentPlan: "cash",
   savedForItem: 0,
   monthlySetAside: 0,
+  recurringCost: 0,
   needGate: "useful",
   usageGate: "weekly",
   replacementGate: "upgrade",
@@ -237,6 +273,14 @@ function isCategory(value: unknown): value is Category {
   return typeof value === "string" && categories.includes(value as Category);
 }
 
+function isProductType(value: unknown): value is ProductType {
+  return typeof value === "string" && productTypes.includes(value as ProductType);
+}
+
+function isEvidenceLevel(value: unknown): value is EvidenceLevel {
+  return typeof value === "string" && evidenceLevels.includes(value as EvidenceLevel);
+}
+
 function isPaymentPlan(value: unknown): value is PaymentPlan {
   return value === "cash" || value === "reserved-installment" || value === "debt";
 }
@@ -281,10 +325,13 @@ function isWishItem(value: unknown): value is WishItem {
     typeof value.name === "string" &&
     isFiniteNumber(value.price) &&
     isCategory(value.category) &&
+    isProductType(value.productType) &&
     typeof value.reason === "string" &&
+    isEvidenceLevel(value.evidenceLevel) &&
     isPaymentPlan(value.paymentPlan) &&
     isFiniteNumber(value.savedForItem) &&
     isFiniteNumber(value.monthlySetAside) &&
+    isFiniteNumber(value.recurringCost) &&
     isNeedGate(value.needGate) &&
     isUsageGate(value.usageGate) &&
     isReplacementGate(value.replacementGate) &&
@@ -380,16 +427,26 @@ function getUsesPerYear(usageGate: UsageGate) {
   return { daily: 365, weekly: 52, monthly: 12 }[usageGate] || 12;
 }
 
+function getAnnualRecurringCost(item: WishItem) {
+  return Math.max(item.recurringCost, 0) * 12;
+}
+
+function getOwnershipCost(item: WishItem) {
+  return item.price + getAnnualRecurringCost(item) * Math.max(item.expectedUseYears || 1, 1);
+}
+
 export function getCostPerUse(item: WishItem) {
   const usesPerYear = getUsesPerYear(item.usageGate);
   const expectedUseYears = Math.max(item.expectedUseYears || 1, 1);
-  const value = item.price / (usesPerYear * expectedUseYears);
+  const ownershipCost = getOwnershipCost(item);
+  const value = ownershipCost / (usesPerYear * expectedUseYears);
 
   return {
     value,
     label: `ประมาณ ${value.toFixed(2)} บาท/ครั้ง`,
     usesPerYear,
     expectedUseYears,
+    ownershipCost,
   };
 }
 
@@ -474,8 +531,62 @@ function isLowPriceUsefulItem(item: WishItem, profile: FinancialProfile) {
   );
 }
 
+function getEvidenceScore(item: WishItem) {
+  return {
+    feeling: 1,
+    researched: 3,
+    tried: 4,
+    "problem-proven": 5,
+  }[item.evidenceLevel];
+}
+
+function getProductTypeScore(item: WishItem) {
+  const base = {
+    durable: 3,
+    upgrade: item.replacementGate === "upgrade" ? 3 : 2,
+    subscription: item.recurringCost > 0 ? 2 : 1,
+    experience: item.canWait ? 2 : 3,
+    learning: item.usageGate === "daily" || item.usageGate === "weekly" ? 4 : 3,
+    health: item.currentPainLevel >= 3 || item.needGate === "essential" ? 5 : 4,
+    home: item.replacementGate === "replace" ? 4 : 3,
+  }[item.productType];
+
+  return clamp(base, 1, 5);
+}
+
+function getRecurringBurden(item: WishItem, profile: FinancialProfile) {
+  if (item.recurringCost <= 0) return { level: "none", scorePenalty: 0, regretPenalty: 0, label: "" } as const;
+
+  const ratio = profile.monthlyFunBudget > 0 ? item.recurringCost / profile.monthlyFunBudget : 1;
+  if (ratio >= 0.25) {
+    return {
+      level: "high",
+      scorePenalty: 12,
+      regretPenalty: 16,
+      label: `ค่าใช้จ่ายต่อเนื่องสูง (${formatCurrency(item.recurringCost)}/เดือน)`,
+    } as const;
+  }
+  if (ratio >= 0.1) {
+    return {
+      level: "medium",
+      scorePenalty: 6,
+      regretPenalty: 8,
+      label: `มีค่าใช้จ่ายต่อเนื่อง ${formatCurrency(item.recurringCost)}/เดือน`,
+    } as const;
+  }
+
+  return {
+    level: "low",
+    scorePenalty: 2,
+    regretPenalty: 3,
+    label: `มีค่าใช้จ่ายต่อเนื่อง ${formatCurrency(item.recurringCost)}/เดือน`,
+  } as const;
+}
+
 function getSuggestedCoolingDays(item: WishItem) {
+  if (item.evidenceLevel === "feeling") return 30;
   if (item.upgradeReason === "fomo" || item.trendDriven || item.promoOnly) return 30;
+  if (item.productType === "subscription" || item.recurringCost > 0) return 30;
   if (item.price <= 1500) return 7;
   if (item.price <= 3000) return 14;
   return 30;
@@ -490,6 +601,7 @@ function getFinancialGate(item: WishItem, profile: FinancialProfile) {
   const expensiveItemNeedsDedicatedMoney = item.price > 3000 && savedForItem < item.price && item.price > funBudgetLeft;
   const expensiveReserveBlocked =
     item.price > 10000 && profile.emergencyReserve < profile.targetEmergencyReserve && savedForItem < item.price;
+  const recurringBurden = getRecurringBurden(item, profile);
 
   if (item.paymentPlan === "debt" && item.replacementGate === "upgrade" && savedForItem < item.price) {
     return {
@@ -520,6 +632,15 @@ function getFinancialGate(item: WishItem, profile: FinancialProfile) {
   }
   if (profile.monthlyFunBudget <= 0) {
     return { status: "review", score: 3, label: "การเงินต้องเช็ก: ยังไม่ได้ตั้งงบความสุขรายเดือน", planLabel: "ตั้ง Financial Profile ก่อน", planSummary: "Needs profile" } as const;
+  }
+  if (recurringBurden.level === "high") {
+    return {
+      status: "review",
+      score: 2,
+      label: recurringBurden.label,
+      planLabel: "เช็กว่ายังรับภาระรายเดือนได้จริงก่อนเริ่ม",
+      planSummary: "Recurring",
+    } as const;
   }
   if (expensiveItemNeedsDedicatedMoney) {
     return {
@@ -558,12 +679,15 @@ function getGateScores(item: WishItem) {
     replacement: replacementScore,
     timing: { now: 5, wait: 3, bad: 1 }[item.timingGate] || 3,
     alternative: { compared: 5, "not-compared": 2, "cheaper-good": 1 }[item.alternativeGate] || 2,
+    evidence: getEvidenceScore(item),
+    productType: getProductTypeScore(item),
   };
 }
 
 function getRegretSignals(item: WishItem, profile: FinancialProfile, financial: ReturnType<typeof getFinancialGate>) {
   const upgradeAnalysis = getUpgradeAnalysis(item);
   const funBudgetLeft = getFunBudgetLeft(profile);
+  const recurringBurden = getRecurringBurden(item, profile);
   const count = [
     item.similarOwned,
     item.trendDriven,
@@ -573,6 +697,8 @@ function getRegretSignals(item: WishItem, profile: FinancialProfile, financial: 
     item.needGate === "nice",
     item.timingGate === "bad",
     item.alternativeGate === "cheaper-good",
+    item.evidenceLevel === "feeling",
+    recurringBurden.level === "high",
   ].filter(Boolean).length;
 
   let score = 40;
@@ -590,6 +716,11 @@ function getRegretSignals(item: WishItem, profile: FinancialProfile, financial: 
   if (item.price > 10000 && profile.emergencyReserve < profile.targetEmergencyReserve) score += 12;
   if (upgradeAnalysis.missingProblemForWeakReason) score += 14;
   if (upgradeAnalysis.lowPainLowImpact && item.replacementGate === "upgrade") score += 4;
+  if (item.evidenceLevel === "feeling") score += 12;
+  if (item.evidenceLevel === "researched") score -= 4;
+  if (item.evidenceLevel === "tried") score -= 8;
+  if (item.evidenceLevel === "problem-proven") score -= 10;
+  score += recurringBurden.regretPenalty;
 
   if (item.upgradeReason === "broken") score -= 8;
   if (item.upgradeReason === "discomfort") score -= 8;
@@ -625,6 +756,7 @@ function getBaseRecommendation(item: WishItem, profile: FinancialProfile, worthS
   if (!lowPriceUseful && (upgradeAnalysis.weakOwnedUpgrade || upgradeAnalysis.missingProblemForWeakReason)) return { label: "Not Now", className: "wait" } as const;
   if (financial.status === "save") return { label: "Save First", className: "save" } as const;
   if (financial.status === "review") return { label: "Needs Review", className: "wait" } as const;
+  if (item.evidenceLevel === "feeling" && item.price > 1500) return { label: "Find Evidence", className: "compare" } as const;
   if (item.alternativeGate !== "compared") return { label: "Compare", className: "compare" } as const;
   if (regretSignals.level === "high") return { label: "Wait 30 Days", className: "wait" } as const;
   if (worthScore >= 74 && regretRisk <= 34 && financial.status === "safe") return { label: "Buy Now", className: "buy" } as const;
@@ -642,6 +774,7 @@ function getBlockedReason(item: WishItem, financial: ReturnType<typeof getFinanc
   if (item.similarOwned && item.pastUnused) return "เคยซื้อของแนวนี้แล้วไม่ค่อยได้ใช้";
   if (item.alternativeGate === "not-compared") return "ยังไม่ได้เทียบอย่างน้อย 2 ตัวเลือก";
   if (item.alternativeGate === "cheaper-good") return "มีตัวเลือกถูกกว่าที่ตอบโจทย์พอ";
+  if (item.evidenceLevel === "feeling" && item.price > 1500) return "เหตุผลยังเป็นความรู้สึกมากกว่าหลักฐาน";
   if (regretSignals.level === "high") return "สัญญาณเสียดายสูงเกินไป";
   if (item.needGate === "nice" && item.usageGate !== "daily") return "ยังเป็นของอยากได้มากกว่าของที่ใช้จริงบ่อย";
   return `คะแนนยังไม่ถึงเกณฑ์: Worth ${worthScore}/100, Regret ${Math.round(regretRisk)}%`;
@@ -669,6 +802,7 @@ function getReadiness(item: WishItem, profile: FinancialProfile, worthScore: num
     (!(item.similarOwned && item.canWait) || lowPriceUseful) &&
     upgradeReady &&
     regretSignals.level !== "high" &&
+    item.evidenceLevel !== "feeling" &&
     item.alternativeGate === "compared" &&
     (item.needGate !== "nice" || item.usageGate === "daily");
 
@@ -684,10 +818,14 @@ function getReadiness(item: WishItem, profile: FinancialProfile, worthScore: num
   return { readyToBuy: false, className: "pending", label: "รอยืนยันความอยาก", detail: "ครบเวลารอแล้ว ถ้ายังอยากได้จริงให้ติ๊กตอนแก้ไขรายการ" } as const;
 }
 
-function getReasons(item: WishItem, financial: ReturnType<typeof getFinancialGate>, regretSignals: ReturnType<typeof getRegretSignals>) {
+function getReasons(item: WishItem, profile: FinancialProfile, financial: ReturnType<typeof getFinancialGate>, regretSignals: ReturnType<typeof getRegretSignals>) {
   const upgradeAnalysis = getUpgradeAnalysis(item);
+  const recurringBurden = getRecurringBurden(item, profile);
   const reasons: string[] = [financial.label];
   if (financial.planLabel) reasons.push(financial.planLabel);
+  reasons.push(productTypeLabels[item.productType]);
+  reasons.push(evidenceLevelLabels[item.evidenceLevel]);
+  if (recurringBurden.label) reasons.push(recurringBurden.label);
   if (getEffectiveNeedGate(item) === "essential") reasons.push("จำเป็นจริง");
   if (item.usageGate === "daily") reasons.push("ใช้เกือบทุกวัน");
   if (item.replacementGate === "replace") reasons.push("แทนของเดิมที่มีปัญหา");
@@ -712,6 +850,7 @@ function getReasons(item: WishItem, financial: ReturnType<typeof getFinancialGat
 
 function getBlocks(item: WishItem, profile: FinancialProfile, financial: ReturnType<typeof getFinancialGate>) {
   const upgradeAnalysis = getUpgradeAnalysis(item);
+  const recurringBurden = getRecurringBurden(item, profile);
   const daysWaited = getDaysWaited(item.createdAt);
   const effectiveCoolingDays = Math.min(item.coolingDays, getSuggestedCoolingDays(item));
   const daysLeft = Math.max(effectiveCoolingDays - daysWaited, 0);
@@ -725,6 +864,8 @@ function getBlocks(item: WishItem, profile: FinancialProfile, financial: ReturnT
 
   if (financial.status === "risky" || financial.status === "save" || financial.status === "review") blocks.financial.push(financial.label);
   if (financial.planLabel && financial.status !== "safe") blocks.financial.push(financial.planLabel);
+  if (recurringBurden.level === "medium" || recurringBurden.level === "high") blocks.financial.push(recurringBurden.label);
+  if (item.evidenceLevel === "feeling" && item.price > 1500) blocks.decision.push("เหตุผลยังเป็นความรู้สึก ควรหาหลักฐานเพิ่มก่อนซื้อ");
   if (item.alternativeGate === "not-compared") blocks.decision.push("ยังไม่ได้เทียบอย่างน้อย 2 ตัวเลือก");
   if (item.alternativeGate === "cheaper-good") blocks.decision.push("มีตัวเลือกถูกกว่าที่ตอบโจทย์พอ");
   if (item.similarOwned) blocks.decision.push(lowPriceUseful ? "มีของคล้ายกันอยู่แล้ว แต่ราคาต่ำและแก้ปัญหาที่เจอทุกวัน" : "มีของคล้ายกันอยู่แล้วและยังรอได้");
@@ -812,17 +953,21 @@ export function scoreItem(item: WishItem, profile: FinancialProfile) {
     gateScores.replacement * 13 +
     gateScores.timing * 12 +
     gateScores.alternative * 10 +
+    gateScores.evidence * 8 +
+    gateScores.productType * 6 +
     financial.score * 17 +
     getUpgradeReasonScore(item) * 3 +
     item.currentPainLevel * 2 +
     item.improvementImpact * 2;
 
   const similarOwnedPenalty = item.similarOwned ? 14 : 0;
+  const recurringBurden = getRecurringBurden(item, profile);
   const regretRisk = regretSignals.score;
   const worthScore = clamp(
     Math.round(
       positiveScore / 5 -
         regretRisk * 0.35 -
+        recurringBurden.scorePenalty -
         similarOwnedPenalty -
         (upgradeAnalysis.missingProblemForWeakReason ? 12 : 0) -
         (upgradeAnalysis.lowPainLowImpact && item.replacementGate === "upgrade" ? 8 : 0),
@@ -849,10 +994,13 @@ export function scoreItem(item: WishItem, profile: FinancialProfile) {
     item.improvementImpact * 3 +
     (item.usageGate === "daily" ? 10 : 0) +
     (item.price <= getFunBudgetLeft(profile) ? 10 : 0) +
-    (item.savedForItem >= item.price ? 10 : 0) -
+    (item.savedForItem >= item.price ? 10 : 0) +
+    (item.evidenceLevel === "problem-proven" ? 10 : item.evidenceLevel === "tried" ? 8 : item.evidenceLevel === "researched" ? 4 : 0) -
+    recurringBurden.scorePenalty -
     (recommendation.label === "Too Risky" ? 30 : 0) -
     (item.paymentPlan === "debt" && item.replacementGate === "upgrade" ? 25 : 0) -
     (item.pastUnused ? 20 : 0) -
+    (item.evidenceLevel === "feeling" ? 12 : 0) -
     (item.upgradeReason === "fomo" ? 15 : 0) -
     (item.upgradeReason === "wantBetter" ? 10 : 0) -
     (item.similarOwned && item.currentPainLevel <= 2 ? 10 : 0) -
@@ -881,7 +1029,7 @@ export function scoreItem(item: WishItem, profile: FinancialProfile) {
       currentPainLevel: item.currentPainLevel,
       improvementImpact: item.improvementImpact,
     },
-    reasons: getReasons(item, financial, regretSignals),
+    reasons: getReasons(item, profile, financial, regretSignals),
   };
 }
 
@@ -918,10 +1066,13 @@ function normalizeWishItem(raw: unknown, profile = defaultProfile): WishItem | n
     name: typeof raw.name === "string" ? raw.name : "",
     price: isFiniteNumber(raw.price) ? raw.price : 0,
     category: isCategory(raw.category) ? raw.category : base.category,
+    productType: isProductType(raw.productType) ? raw.productType : base.productType,
     reason: typeof raw.reason === "string" ? raw.reason : "",
+    evidenceLevel: isEvidenceLevel(raw.evidenceLevel) ? raw.evidenceLevel : base.evidenceLevel,
     paymentPlan: isPaymentPlan(raw.paymentPlan) ? raw.paymentPlan : base.paymentPlan,
     savedForItem: isFiniteNumber(raw.savedForItem) ? raw.savedForItem : 0,
     monthlySetAside: isFiniteNumber(raw.monthlySetAside) ? raw.monthlySetAside : 0,
+    recurringCost: isFiniteNumber(raw.recurringCost) ? Math.max(raw.recurringCost, 0) : base.recurringCost,
     needGate: isNeedGate(raw.needGate) ? raw.needGate : base.needGate,
     usageGate: isUsageGate(raw.usageGate) ? raw.usageGate : base.usageGate,
     replacementGate: isReplacementGate(raw.replacementGate) ? raw.replacementGate : base.replacementGate,
