@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { ChevronDown, Download, Pencil, Plus, Trash2, Upload } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronDown, Download, Pencil, Plus, Trash2, Upload } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -96,6 +96,34 @@ const coolingDaysOptions = [
   { value: 30, label: "30 วัน", description: "ของราคาสูง หรือเสี่ยงเสียดายสูง" },
 ];
 
+function getManualOrderedItems<T extends Pick<WishItem, "id" | "sortOrder" | "createdAt" | "updatedAt">>(items: T[]) {
+  return [...items].sort((a, b) => a.sortOrder - b.sortOrder || (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt));
+}
+
+function getNextManualSortOrder(items: WishItem[]) {
+  if (items.length === 0) return 0;
+  return Math.min(...items.map((item) => item.sortOrder)) - 1;
+}
+
+function normalizeManualSortOrders(items: WishItem[]) {
+  return getManualOrderedItems(items).map((item, index) => ({ ...item, sortOrder: index }));
+}
+
+function reorderManualItems(items: WishItem[], itemId: string, direction: "up" | "down") {
+  const ordered = normalizeManualSortOrders(items);
+  const currentIndex = ordered.findIndex((item) => item.id === itemId);
+  if (currentIndex === -1) return items;
+
+  const nextIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+  if (nextIndex < 0 || nextIndex >= ordered.length) return ordered;
+
+  const swapped = [...ordered];
+  [swapped[currentIndex], swapped[nextIndex]] = [swapped[nextIndex], swapped[currentIndex]];
+  const orderById = new Map(swapped.map((item, index) => [item.id, index]));
+
+  return items.map((item) => ({ ...item, sortOrder: orderById.get(item.id) ?? item.sortOrder }));
+}
+
 export function WorthItApp() {
   const isHydrated = useSyncExternalStore(emptySubscribe, () => true, () => false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -162,11 +190,14 @@ export function WorthItApp() {
   }, [financialProfile]);
 
   const sortedItems = useMemo(() => sortItems(displayItems, displayFinancialProfile, sortMode), [displayFinancialProfile, displayItems, sortMode]);
+  const manualItemIds = useMemo(() => getManualOrderedItems(displayItems).map((item) => item.id), [displayItems]);
+  const manualItemPosition = useMemo(() => new Map(manualItemIds.map((id, index) => [id, index])), [manualItemIds]);
   const draftScore = useMemo(() => scoreItem({ ...draft, id: editingId ?? "draft", createdAt: draftCreatedAt }, displayFinancialProfile), [displayFinancialProfile, draft, draftCreatedAt, editingId]);
   const summary = useMemo(() => {
-    const totalCost = displayItems.reduce((sum, item) => sum + item.price, 0);
-    const totalRecurring = displayItems.reduce((sum, item) => sum + item.recurringCost, 0);
-    const readyCount = sortedItems.filter((item) => item.score.readiness.readyToBuy).length;
+    const includedItems = displayItems.filter((item) => item.includeInSummary);
+    const totalCost = includedItems.reduce((sum, item) => sum + item.price, 0);
+    const totalRecurring = includedItems.reduce((sum, item) => sum + item.recurringCost, 0);
+    const readyCount = sortedItems.filter((item) => item.includeInSummary && item.score.readiness.readyToBuy).length;
     return { totalItems: displayItems.length, totalCost, totalRecurring, readyCount };
   }, [displayItems, sortedItems]);
 
@@ -210,13 +241,26 @@ export function WorthItApp() {
       updatedAt: editingId ? Date.now() : undefined,
     };
 
-    setItems((current) => (editingId ? current.map((item) => (item.id === editingId ? nextItem : item)) : [nextItem, ...current]));
+    setItems((current) =>
+      editingId
+        ? current.map((item) => (item.id === editingId ? nextItem : item))
+        : [{ ...nextItem, sortOrder: getNextManualSortOrder(current), includeInSummary: true }, ...current]
+    );
     resetDialog();
   }
 
   function removeItem(itemId: string) {
     setItems((current) => current.filter((item) => item.id !== itemId));
     if (editingId === itemId) resetDialog();
+  }
+
+  function moveItemInManualOrder(itemId: string, direction: "up" | "down") {
+    setSortMode("manual");
+    setItems((current) => reorderManualItems(current, itemId, direction));
+  }
+
+  function toggleItemSummary(itemId: string, includeInSummary: boolean) {
+    setItems((current) => current.map((item) => (item.id === itemId ? { ...item, includeInSummary } : item)));
   }
 
   function handleBackup() {
@@ -369,6 +413,7 @@ export function WorthItApp() {
             <div className="grid w-44 gap-2">
               <Label htmlFor="sortMode">เรียงตาม</Label>
               <Select id="sortMode" value={sortMode} onChange={(event) => setSortMode(event.target.value as SortMode)}>
+                <option value="manual">เรียงเอง</option>
                 <option value="system">แนะนำโดยระบบ</option>
                 <option value="worth">คะแนนคุ้มค่าสูงสุด</option>
                 <option value="regret-low">ความเสี่ยงเสียใจต่ำสุด</option>
@@ -617,9 +662,22 @@ export function WorthItApp() {
           </div>
         ) : (
           <div className="grid gap-4">
-            {sortedItems.map((item) => (
-              <WishCard key={item.id} item={item} onEdit={() => openEditDialog(item)} onDelete={() => removeItem(item.id)} />
-            ))}
+            {sortedItems.map((item) => {
+              const position = manualItemPosition.get(item.id) ?? 0;
+              return (
+                <WishCard
+                  key={item.id}
+                  item={item}
+                  canMoveUp={position > 0}
+                  canMoveDown={position < manualItemIds.length - 1}
+                  onMoveUp={() => moveItemInManualOrder(item.id, "up")}
+                  onMoveDown={() => moveItemInManualOrder(item.id, "down")}
+                  onToggleSummary={(checked) => toggleItemSummary(item.id, checked)}
+                  onEdit={() => openEditDialog(item)}
+                  onDelete={() => removeItem(item.id)}
+                />
+              );
+            })}
           </div>
         )}
       </section>
@@ -638,7 +696,25 @@ function MetricCard({ label, value }: { label: string; value: string }) {
   );
 }
 
-function WishCard({ item, onEdit, onDelete }: { item: ReturnType<typeof sortItems>[number]; onEdit: () => void; onDelete: () => void }) {
+function WishCard({
+  item,
+  canMoveUp,
+  canMoveDown,
+  onMoveUp,
+  onMoveDown,
+  onToggleSummary,
+  onEdit,
+  onDelete,
+}: {
+  item: ReturnType<typeof sortItems>[number];
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+  onToggleSummary: (checked: boolean) => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   return (
@@ -652,7 +728,15 @@ function WishCard({ item, onEdit, onDelete }: { item: ReturnType<typeof sortItem
           </div>
           <p className="max-w-2xl text-sm leading-6 text-muted-foreground">{getReasonCopy(item)}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button type="button" variant="ghost" size="icon" onClick={onMoveUp} disabled={!canMoveUp} title="เลื่อนขึ้น">
+            <ArrowUp className="size-4" />
+            <span className="sr-only">เลื่อนขึ้น</span>
+          </Button>
+          <Button type="button" variant="ghost" size="icon" onClick={onMoveDown} disabled={!canMoveDown} title="เลื่อนลง">
+            <ArrowDown className="size-4" />
+            <span className="sr-only">เลื่อนลง</span>
+          </Button>
           <Button type="button" variant="ghost" size="icon" onClick={onEdit} title="แก้ไขรายการ">
             <Pencil className="size-4" />
             <span className="sr-only">แก้ไขรายการ</span>
@@ -689,7 +773,7 @@ function WishCard({ item, onEdit, onDelete }: { item: ReturnType<typeof sortItem
         </div>
       </div>
 
-      <div className="mt-4 flex flex-wrap items-start gap-2">
+      <div className="mt-4 flex flex-wrap items-center gap-2">
         <span className={`rounded-lg border px-3 py-2 text-sm font-semibold ${recommendationClass(item.score.recommendation.className)}`}>{item.score.recommendation.label}</span>
         <span className={`rounded-lg px-3 py-2 text-sm leading-6 ${readinessClass(item.score.readiness.className)}`}>
           {item.score.readiness.label}: {item.score.readiness.detail}
@@ -697,6 +781,7 @@ function WishCard({ item, onEdit, onDelete }: { item: ReturnType<typeof sortItem
         <span className="rounded-lg border border-accent/20 bg-accent/8 px-3 py-2 text-sm font-semibold text-[#5eead4]">
           {purchaseStageLabels[item.score.stage.effective]}
         </span>
+        <SummarySwitch checked={item.includeInSummary} onChange={onToggleSummary} />
       </div>
 
       <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-6">
@@ -851,6 +936,44 @@ function ToggleRow({ checked, onChange, label }: { checked: boolean; onChange: (
     <label className="flex items-center gap-3 rounded-lg border border-(--border) bg-(--card-muted) px-4 py-3 text-sm text-(--foreground)">
       <input className="size-4 accent-(--accent)" type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />
       <span>{label}</span>
+    </label>
+  );
+}
+
+function SummarySwitch({ checked, onChange }: { checked: boolean; onChange: (checked: boolean) => void }) {
+  return (
+    <label
+      className={cn(
+        "inline-flex min-h-10 cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 text-sm font-semibold transition",
+        "focus-within:ring-2 focus-within:ring-ring",
+        checked
+          ? "border-accent/20 bg-accent/8 text-[#5eead4]"
+          : "border-border bg-[#121717] text-muted-foreground"
+      )}
+    >
+      <input
+        type="checkbox"
+        role="switch"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+        className="sr-only"
+        aria-label="รวมในยอดรวม"
+      />
+      <span
+        aria-hidden="true"
+        className={cn(
+          "relative h-5 w-9 rounded-full border transition",
+          checked ? "border-accent/40 bg-accent/30" : "border-border bg-card-muted"
+        )}
+      >
+        <span
+          className={cn(
+            "absolute left-0.5 top-0.5 size-4 rounded-full transition",
+            checked ? "translate-x-4 bg-accent" : "bg-muted-foreground"
+          )}
+        />
+      </span>
+      <span>{checked ? "รวมในยอดรวม" : "ไม่รวมยอดรวม"}</span>
     </label>
   );
 }

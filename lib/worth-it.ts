@@ -9,7 +9,7 @@ export type PurchaseStage = "park" | "research" | "saving" | "buy";
 export type UpgradeReason = "broken" | "discomfort" | "productivity" | "qualityOfLife" | "wantBetter" | "fomo";
 export type ProductType = "durable" | "upgrade" | "subscription" | "experience" | "learning" | "health" | "home";
 export type EvidenceLevel = "feeling" | "researched" | "tried" | "problem-proven";
-export type SortMode = "system" | "worth" | "regret-low" | "price-asc" | "price-desc" | "newest" | "closest";
+export type SortMode = "manual" | "system" | "worth" | "regret-low" | "price-asc" | "price-desc" | "newest" | "closest";
 
 export type WishItem = {
   id: string;
@@ -42,6 +42,8 @@ export type WishItem = {
   upgradeReason: UpgradeReason;
   currentPainLevel: 0 | 1 | 2 | 3 | 4 | 5;
   improvementImpact: 0 | 1 | 2 | 3 | 4 | 5;
+  sortOrder: number;
+  includeInSummary: boolean;
   createdAt: number;
   updatedAt?: number;
 };
@@ -146,6 +148,8 @@ export const demoItems: WishItem[] = [
     upgradeReason: "productivity",
     currentPainLevel: 4,
     improvementImpact: 4,
+    sortOrder: 0,
+    includeInSummary: true,
     createdAt: DEMO_CREATED_AT.headphones,
   },
   {
@@ -179,6 +183,8 @@ export const demoItems: WishItem[] = [
     upgradeReason: "fomo",
     currentPainLevel: 1,
     improvementImpact: 2,
+    sortOrder: 1,
+    includeInSummary: true,
     createdAt: DEMO_CREATED_AT.keyboard,
   },
   {
@@ -212,6 +218,8 @@ export const demoItems: WishItem[] = [
     upgradeReason: "qualityOfLife",
     currentPainLevel: 0,
     improvementImpact: 1,
+    sortOrder: 2,
+    includeInSummary: true,
     createdAt: DEMO_CREATED_AT.runningShoes,
   },
 ];
@@ -246,6 +254,8 @@ export const emptyItem = (): Omit<WishItem, "id" | "createdAt"> => ({
   upgradeReason: "wantBetter",
   currentPainLevel: 0,
   improvementImpact: 1,
+  sortOrder: 0,
+  includeInSummary: true,
   updatedAt: undefined,
 });
 
@@ -351,6 +361,8 @@ function isWishItem(value: unknown): value is WishItem {
     isUpgradeReason(value.upgradeReason) &&
     isPainOrImpactLevel(value.currentPainLevel) &&
     isPainOrImpactLevel(value.improvementImpact) &&
+    isFiniteNumber(value.sortOrder) &&
+    isBoolean(value.includeInSummary) &&
     isFiniteNumber(value.createdAt) &&
     (value.updatedAt === undefined || isFiniteNumber(value.updatedAt))
   );
@@ -1037,6 +1049,7 @@ export function sortItems(items: WishItem[], profile: FinancialProfile, sortMode
   return [...items]
     .map((item) => ({ ...item, score: scoreItem(item, profile) }))
     .sort((a, b) => {
+      if (sortMode === "manual") return a.sortOrder - b.sortOrder || (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt);
       if (sortMode === "worth") return b.score.worthScore - a.score.worthScore || (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt);
       if (sortMode === "regret-low") return a.score.regretRisk - b.score.regretRisk || b.score.sortPriority - a.score.sortPriority;
       if (sortMode === "price-desc") return b.price - a.price;
@@ -1056,7 +1069,7 @@ export function sortItems(items: WishItem[], profile: FinancialProfile, sortMode
     });
 }
 
-function normalizeWishItem(raw: unknown, profile = defaultProfile): WishItem | null {
+function normalizeWishItem(raw: unknown, profile = defaultProfile, fallbackSortOrder = 0): WishItem | null {
   if (!isRecord(raw)) return null;
 
   const base = emptyItem();
@@ -1092,6 +1105,8 @@ function normalizeWishItem(raw: unknown, profile = defaultProfile): WishItem | n
     upgradeReason: isUpgradeReason(raw.upgradeReason) ? raw.upgradeReason : base.upgradeReason,
     currentPainLevel: isPainOrImpactLevel(raw.currentPainLevel) ? raw.currentPainLevel : base.currentPainLevel,
     improvementImpact: isPainOrImpactLevel(raw.improvementImpact) ? raw.improvementImpact : base.improvementImpact,
+    sortOrder: isFiniteNumber(raw.sortOrder) ? raw.sortOrder : fallbackSortOrder,
+    includeInSummary: isBoolean(raw.includeInSummary) ? raw.includeInSummary : true,
     createdAt,
     updatedAt: isFiniteNumber(raw.updatedAt) ? raw.updatedAt : undefined,
   };
@@ -1119,7 +1134,7 @@ export function normalizeFinancialProfile(raw: unknown): FinancialProfile {
 
 export function normalizeItems(raw: unknown, profile = defaultProfile): WishItem[] {
   if (!Array.isArray(raw)) return demoItems;
-  return raw.map((item) => normalizeWishItem(item, profile)).filter((item): item is WishItem => item !== null);
+  return raw.map((item, index) => normalizeWishItem(item, profile, index)).filter((item): item is WishItem => item !== null);
 }
 
 function normalizeBackupPayload(raw: unknown): BackupPayload | null {
